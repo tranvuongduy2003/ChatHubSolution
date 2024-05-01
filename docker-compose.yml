@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  cassandradb:
+    image: cassandra:4.0.12-jammy
+    
+  chathub.api:
+    image: ${DOCKER_REGISTRY-}chathub-api:${PLATFORM:-linux}-${TAG:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+# networks section
+networks:
+  default:
+    name: chathub
+    driver: bridge
+
+# volumes section
+volumes:
+  cassandra_data:
+    name: cassandra_data

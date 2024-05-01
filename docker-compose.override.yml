@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  # cassandra
+  cassandradb:
+    container_name: cassandradb
+    restart: always
+    environment:
+      - CASSANDRA_USER=admin
+      - CASSANDRA_PASSWORD=admin
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandradb
+
+  # api sections
+  chathub.api:
+    container_name: chathub.api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - "ConnectionStrings:DefaultConnection=Offline=False;Database=ChathubDB;Port=79042000;Server=localhost;"
+    depends_on:
+      - cassandradb
+    ports:
+      - "8333:80"
+    restart: always
