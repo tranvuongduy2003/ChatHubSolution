@@ -1,11 +1,12 @@
-﻿using ChatHubSolution.Data;
+﻿using ChatHubSolution.Constants;
+using ChatHubSolution.Data;
 using ChatHubSolution.Data.Entities;
+using ChatHubSolution.Extensions;
+using ChatHubSolution.Models;
 using ChatHubSolution.Services;
-using ChatHubSolution.ViewModels;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization;
 
@@ -21,7 +22,14 @@ namespace ChatHubSolution.Extentions
 
             services.ConfigureSwagger();
 
-            services.ConfigureApplicationDbContext(configuration);
+            services.AddSingleton(provider => new CassandraOptions
+            {
+                Keyspace = CanssandraConstant.Keyspace,
+                Config = [
+                  User.GetConfig(CanssandraConstant.Keyspace)
+                ]
+            });
+            services.RegisterCassandra();
 
             services.AddSignalR();
 
@@ -104,15 +112,6 @@ namespace ChatHubSolution.Extentions
             {
                 options.SuppressModelStateInvalidFilter = true;
             });
-
-            return services;
-        }
-
-        private static IServiceCollection ConfigureApplicationDbContext(this IServiceCollection services, IConfiguration configuration)
-        {
-            var connectionString = configuration.GetConnectionString("DefaultConnection");
-
-            //services.AddDbContext<ApplicationDbContext>(m => m.UseSqlServer(connectionString));
 
             return services;
         }

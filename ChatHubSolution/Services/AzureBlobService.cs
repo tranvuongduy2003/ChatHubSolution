@@ -1,7 +1,7 @@
 ﻿using Azure.Storage;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
-using ChatHubSolution.ViewModels;
+using ChatHubSolution.Models;
 using Microsoft.Extensions.Options;
 
 namespace ChatHubSolution.Services

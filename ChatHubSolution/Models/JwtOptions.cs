@@ -1,4 +1,4 @@
-﻿namespace ChatHubSolution.ViewModels
+﻿namespace ChatHubSolution.Models
 {
     public class JwtOptions
     {
