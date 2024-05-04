@@ -1,14 +1,9 @@
-import {
-  getAccessToken,
-  getRefreshToken,
-  handleRefreshToken,
-  logOut,
-} from "../utils/auth";
 import axios, {
-  AxiosRequestConfig,
   AxiosError,
+  AxiosRequestConfig,
   InternalAxiosRequestConfig,
 } from "axios";
+import { getAccessToken } from "@/utils/auth";
 
 const requestConfig: AxiosRequestConfig = {
   baseURL: import.meta.env.VITE_SERVER_URL,
@@ -42,31 +37,12 @@ export default function initRequest() {
     },
     async (error) => {
       const statusCode = error.response?.status;
-      const originalConfig = error.config;
 
       switch (statusCode) {
         case 401: {
-          const rfToken = getRefreshToken();
-          if (!originalConfig._retry && rfToken) {
-            originalConfig._retry = true;
-            try {
-              console.log("retry");
-              const token = await handleRefreshToken();
-              axios.defaults.headers.common = {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              };
-              return axiosInstance(originalConfig);
-            } catch (error) {
-              logOut();
-            }
-          } else {
-            logOut();
-          }
           break;
         }
         case 403: {
-          logOut();
           break;
         }
         case 500: {

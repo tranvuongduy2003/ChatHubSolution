@@ -1,7 +1,7 @@
 ﻿namespace ChatHubSolution.Constants
 {
-    public static class CanssandraConstant
+    public static class CassandraConstant
     {
-        public const string Keyspace = "trace";
+        public const string Keyspace = "chathub";
     }
 }

@@ -1,5 +1,4 @@
-﻿using Bogus.DataSets;
-using Cassandra;
+﻿using Cassandra;
 using Cassandra.Data.Linq;
 using ChatHubSolution.Data.Entities;
 using ChatHubSolution.Implementation.Interfaces;
@@ -21,8 +20,10 @@ namespace ChatHubSolution.Services
             try
             {
                 var session = cassandraProvider.GetSession();
+
                 await new Table<User>(session).CreateIfNotExistsAsync();
-                await new Table<Address>(session).CreateIfNotExistsAsync();
+                await new Table<Message>(session).CreateIfNotExistsAsync();
+                await new Table<Conversation>(session).CreateIfNotExistsAsync();
             }
             catch (Exception)
             {

@@ -1,12 +1,11 @@
-﻿using ChatHubSolution.Constants;
-using ChatHubSolution.Data;
+﻿using Cassandra.Data.Linq;
 using ChatHubSolution.Data.Entities;
 using ChatHubSolution.DTOs;
 using ChatHubSolution.Helpers;
+using ChatHubSolution.Implementation.Interfaces;
 using ChatHubSolution.Services;
 using EventHubSolution.ViewModels.Systems;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 using System.IdentityModel.Tokens.Jwt;
@@ -17,90 +16,90 @@ namespace ChatHubSolution.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly UserManager<User> _userManager;
-        private readonly RoleManager<IdentityRole> _roleManager;
-        private readonly SignInManager<User> _signInManager;
         private readonly ITokenService _tokenService;
-        private readonly ApplicationDbContext _db;
+        private readonly Cassandra.ISession _session;
 
-        public AuthController(UserManager<User> userManager, RoleManager<IdentityRole> roleManager, SignInManager<User> signInManager, ITokenService tokenService, ApplicationDbContext db)
+        public AuthController(ITokenService tokenService, ICassandraProvider provider)
         {
-            _userManager = userManager;
-            _roleManager = roleManager;
-            _signInManager = signInManager;
             _tokenService = tokenService;
-            _db = db;
+            _session = provider.GetSession();
         }
 
         [HttpPost("signup")]
         public async Task<IActionResult> SignUp([FromBody] UserCreateDto request)
         {
-            var useByEmail = await _userManager.FindByEmailAsync(request.Email);
-            if (useByEmail != null)
+            var getUser = await _session.PrepareAsync("SELECT * FROM users WHERE email = ? ALLOW FILTERING");
+            var row = (await _session.ExecuteAsync(getUser.Bind(request.Email))).FirstOrDefault();
+            if (row != null)
                 return BadRequest(new ApiBadRequestResponse("Email already exists"));
 
-            User user = new()
+            var insertUser = await _session.PrepareAsync("INSERT INTO users (id, name, email, password, createdat, updatedat) VALUES (?, ?, ?, ?, ?, ?)");
+
+            var user = new User
             {
+                Id = Guid.NewGuid().ToString(),
+                Name = request.Name,
                 Email = request.Email,
-                FullName = request.FullName,
+                Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                CreatedAt = DateTime.UtcNow.ToString(),
+                UpdatedAt = DateTime.UtcNow.ToString(),
             };
 
-            var result = await _userManager.CreateAsync(user, request.Password);
-            if (result.Succeeded)
+            var result = await _session.ExecuteAsync(insertUser.Bind(
+                    user.Id,
+                    user.Name,
+                    user.Email,
+                    user.Password,
+                    user.CreatedAt,
+                    user.UpdatedAt));
+
+            if (result != null)
             {
-                var userToReturn = await _userManager.FindByEmailAsync(request.Email);
-
-                await _userManager.AddToRoleAsync(user, "USER");
-
-                await _signInManager.PasswordSignInAsync(user, request.Password, false, false);
-
                 //TODO: If user was found, generate JWT Token
                 var accessToken = await _tokenService.GenerateAccessTokenAsync(user);
-                var refreshToken = await _userManager.GenerateUserTokenAsync(user, TokenProviders.DEFAULT, TokenTypes.REFRESH);
-
-                await _userManager.SetAuthenticationTokenAsync(user, TokenProviders.DEFAULT, TokenTypes.REFRESH, refreshToken);
 
                 SignInResponseDto signUpResponse = new SignInResponseDto()
                 {
-                    AccessToken = accessToken,
-                    RefreshToken = refreshToken
+                    AccessToken = accessToken
                 };
 
-                return CreatedAtAction(nameof(SignUp), new { id = userToReturn.Id }, signUpResponse);
+                return Ok(new ApiOkResponse(signUpResponse));
             }
             else
             {
-                return BadRequest(new ApiBadRequestResponse(result));
+                return BadRequest(new ApiBadRequestResponse(""));
             }
         }
 
         [HttpPost("signin")]
         public async Task<IActionResult> SignIn([FromBody] SignInRequestDto request)
         {
-            var user = await _userManager.FindByEmailAsync(request.Email);
-
-            if (user == null)
+            var getUser = await _session.PrepareAsync("SELECT * FROM users WHERE email = ? ALLOW FILTERING");
+            var row = (await _session.ExecuteAsync(getUser.Bind(request.Email))).FirstOrDefault();
+            if (row == null)
                 return NotFound(new ApiNotFoundResponse("Invalid credentials"));
 
-            bool isValid = await _userManager.CheckPasswordAsync(user, request.Password);
+            var user = new User
+            {
+                Id = row.GetValue<string>("id"),
+                Email = row.GetValue<string>("email"),
+                Name = row.GetValue<string>("name"),
+                Password = row.GetValue<string>("password")
+            };
+
+            bool isValid = BCrypt.Net.BCrypt.Verify(request.Password, user.Password);
 
             if (isValid == false)
             {
                 return Unauthorized(new ApiUnauthorizedResponse("Invalid credentials"));
             }
 
-            await _signInManager.PasswordSignInAsync(user, request.Password, false, false);
-
             //TODO: If user was found, generate JWT Token
             var accessToken = await _tokenService.GenerateAccessTokenAsync(user);
-            var refreshToken = await _userManager.GenerateUserTokenAsync(user, TokenProviders.DEFAULT, TokenTypes.REFRESH);
-
-            await _userManager.SetAuthenticationTokenAsync(user, TokenProviders.DEFAULT, TokenTypes.REFRESH, refreshToken);
 
             SignInResponseDto signInResponse = new SignInResponseDto()
             {
-                AccessToken = accessToken,
-                RefreshToken = refreshToken
+                AccessToken = accessToken
             };
 
             return Ok(new ApiOkResponse(signInResponse));
@@ -116,20 +115,22 @@ namespace ChatHubSolution.Controllers
                 return Unauthorized(new ApiUnauthorizedResponse("Unauthorized"));
             }
             var principal = _tokenService.GetPrincipalFromToken(accessToken);
+            var userId = principal.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Jti).Value;
 
-            var user = await _userManager.FindByIdAsync(principal.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Jti).Value);
-            if (user == null)
+            var getUser = await _session.PrepareAsync("SELECT * FROM users WHERE id = ? ALLOW FILTERING");
+            var row = (await _session.ExecuteAsync(getUser.Bind(userId))).FirstOrDefault();
+            if (row == null)
             {
                 return Unauthorized(new ApiUnauthorizedResponse("Unauthorized"));
             }
 
             var userVm = new UserDto()
             {
-                Id = user.Id,
-                Email = user.Email,
-                FullName = user.FullName,
-                CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt
+                Id = row.GetValue<string>("id"),
+                Email = row.GetValue<string>("email"),
+                Name = row.GetValue<string>("name"),
+                CreatedAt = DateTime.Parse(row.GetValue<string>("createdat")),
+                UpdatedAt = DateTime.Parse(row.GetValue<string>("updatedat")),
             };
 
             return Ok(new ApiOkResponse(userVm));

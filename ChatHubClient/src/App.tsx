@@ -1,9 +1,10 @@
 import { Route, Routes } from "react-router-dom";
-import AuthProtectedRoute from "./layout/AuthProtectedRoute";
-import { LoginPage } from "./pages/auth/LoginPage";
-import { SignUpPage } from "./pages/auth/SignUpPage";
-import { HomePage } from "./pages/home/HomePage";
-import HomeLayout from "./layout/HomeLayout";
+import AuthProtectedRoute from "@/layout/AuthProtectedRoute";
+import { LoginPage } from "@/pages/auth/LoginPage";
+import { SignUpPage } from "@/pages/auth/SignUpPage";
+import { HomePage } from "@/pages/home/HomePage";
+import HomeLayout from "@/layout/HomeLayout";
+import { NotFoundPage } from "@/pages/notfound/NotFoundPage";
 
 function App() {
   return (
@@ -19,6 +20,8 @@ function App() {
           {/* Products */}
           <Route path="/" element={<HomePage />} />
         </Route>
+
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   );

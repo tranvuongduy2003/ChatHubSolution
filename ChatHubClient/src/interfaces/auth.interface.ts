@@ -6,10 +6,9 @@ export interface LoginPayload {
 export interface SignUpPayload {
   email: string;
   password: string;
-  fullName: string;
+  name: string;
 }
 
 export interface TokenPayload {
   accessToken: string;
-  refreshToken: string;
 }

@@ -8,6 +8,6 @@
 
         public string ReceiverId { get; set; } = string.Empty;
 
-        public string ConversationId { get; set; } = string.Empty;
+        public string ReceiverName { get; set; } = string.Empty;
     }
 }

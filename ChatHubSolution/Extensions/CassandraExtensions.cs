@@ -1,5 +1,6 @@
 ﻿using Cassandra;
 using Cassandra.Mapping;
+using ChatHubSolution.Constants;
 using ChatHubSolution.Implementation;
 using ChatHubSolution.Implementation.Interfaces;
 using ChatHubSolution.Models;
@@ -14,7 +15,9 @@ namespace ChatHubSolution.Extensions
         {
             var scope = services.BuildServiceProvider();
             var config = services.BuildServiceProvider().GetRequiredService<IConfiguration>();
+
             var cassandraOptions = scope.GetRequiredService<CassandraOptions>();
+
             var cassandraConfig = config.GetSection("Cassandra");
             services.Configure<CassandraConfig>(cassandraConfig);
 
@@ -28,6 +31,7 @@ namespace ChatHubSolution.Extensions
                     .WithPort(conf.Value.Port)
                     .WithCompression(CompressionType.LZ4)
                     .WithCredentials(conf.Value.Username, conf.Value.Password)
+                    .WithDefaultKeyspace(CassandraConstant.Keyspace)
                     .WithQueryOptions(queryOptions)
                     .WithRetryPolicy(new LoggingRetryPolicy(new DefaultRetryPolicy()))
                     .Build();
@@ -35,9 +39,10 @@ namespace ChatHubSolution.Extensions
             services.AddScoped<ICassandraProvider, CassandraProvider>();
 
             // NOTE: Alternative way of mapping entity configurations
-            // MappingConfiguration.Global.Define<CassandraMappings>();
+            MappingConfiguration.Global.Define<CassandraMappings>();
 
-            MappingConfiguration.Global.Define(cassandraOptions.Config);
+            //MappingConfiguration.Global.Define(cassandraOptions.Config);
+
             services.AddHostedService<CassandraHostedService>();
 
             return services;

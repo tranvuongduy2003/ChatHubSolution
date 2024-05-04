@@ -2,7 +2,7 @@
 {
     public interface IDateTracking
     {
-        DateTime CreatedAt { get; set; }
-        DateTime? UpdatedAt { get; set; }
+        string CreatedAt { get; set; }
+        string? UpdatedAt { get; set; }
     }
 }

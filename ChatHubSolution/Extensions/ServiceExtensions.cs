@@ -1,11 +1,9 @@
 ﻿using ChatHubSolution.Constants;
-using ChatHubSolution.Data;
 using ChatHubSolution.Data.Entities;
 using ChatHubSolution.Extensions;
 using ChatHubSolution.Models;
 using ChatHubSolution.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;
 using System.Text.Json.Serialization;
@@ -22,30 +20,27 @@ namespace ChatHubSolution.Extentions
 
             services.ConfigureSwagger();
 
-            services.AddSingleton(provider => new CassandraOptions
-            {
-                Keyspace = CanssandraConstant.Keyspace,
-                Config = [
-                  User.GetConfig(CanssandraConstant.Keyspace)
-                ]
-            });
-            services.RegisterCassandra();
-
             services.AddSignalR();
 
             services.AddCors(p =>
                 p.AddPolicy(appCors, build => { build.WithOrigins("*").AllowAnyMethod().AllowAnyHeader(); }));
-
-            // 2.Setup identity
-            services.AddIdentity<User, IdentityRole>()
-                .AddEntityFrameworkStores<ApplicationDbContext>()
-                .AddDefaultTokenProviders();
 
             services.AddControllers();
             services.AddControllers()
                 .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
             services.AddInfrastructureServices();
+
+            services.AddSingleton(new CassandraOptions
+            {
+                Keyspace = CassandraConstant.Keyspace,
+                Config = [
+                    User.GetConfig(CassandraConstant.Keyspace),
+                    Conversation.GetConfig(CassandraConstant.Keyspace),
+                    Message.GetConfig(CassandraConstant.Keyspace),
+                ]
+            });
+            services.RegisterCassandra();
 
             return services;
         }
@@ -89,25 +84,6 @@ namespace ChatHubSolution.Extentions
 
             services.Configure<JwtOptions>(configuration.GetSection("ApiSettings:JwtOptions"));
 
-            services.Configure<AzureBlobStorage>(configuration.GetSection("AzureBlobStorage"));
-
-            services.Configure<IdentityOptions>(options =>
-            {
-                // Default Lockout settings.
-                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
-                options.Lockout.MaxFailedAccessAttempts = 5;
-                options.Lockout.AllowedForNewUsers = true;
-                options.SignIn.RequireConfirmedPhoneNumber = false;
-                options.SignIn.RequireConfirmedAccount = false;
-                options.SignIn.RequireConfirmedEmail = false;
-                options.User.RequireUniqueEmail = true;
-            });
-
-            services.Configure<DataProtectionTokenProviderOptions>(options =>
-            {
-                options.TokenLifespan = TimeSpan.FromHours(8);
-            });
-
             services.Configure<ApiBehaviorOptions>(options =>
             {
                 options.SuppressModelStateInvalidFilter = true;
@@ -119,8 +95,6 @@ namespace ChatHubSolution.Extentions
         private static IServiceCollection AddInfrastructureServices(this IServiceCollection services)
         {
             services.AddTransient<ITokenService, TokenService>();
-
-            services.AddSingleton<AzureBlobService>();
 
             return services;
         }

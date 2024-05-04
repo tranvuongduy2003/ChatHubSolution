@@ -1,5 +1,4 @@
 ﻿using Cassandra.Mapping;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ChatHubSolution.Data.Entities
 {
@@ -8,12 +7,6 @@ namespace ChatHubSolution.Data.Entities
         public string Name { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
-
-        [NotMapped]
-        public virtual ICollection<Conversation> Conversations { get; set; } = new List<Conversation>();
-
-        [NotMapped]
-        public virtual ICollection<Message> Messages { get; set; } = new List<Message>();
 
         public static Map<User> GetConfig(string keyspace)
         {
@@ -24,7 +17,9 @@ namespace ChatHubSolution.Data.Entities
                 .Column(x => x.Id, x => x.WithName("id"))
                 .Column(x => x.Name, x => x.WithName("name"))
                 .Column(x => x.Email, x => x.WithName("email"))
-                .Column(x => x.Password, x => x.WithName("password"));
+                .Column(x => x.Password, x => x.WithName("password"))
+                .Column(x => x.CreatedAt, x => x.WithName("createdat"))
+                .Column(x => x.UpdatedAt, x => x.WithName("updatedat"));
         }
     }
 }

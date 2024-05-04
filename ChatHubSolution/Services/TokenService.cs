@@ -1,7 +1,5 @@
-﻿using ChatHubSolution.Data;
-using ChatHubSolution.Data.Entities;
+﻿using ChatHubSolution.Data.Entities;
 using ChatHubSolution.Models;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -13,16 +11,10 @@ namespace ChatHubSolution.Services
     public class TokenService : ITokenService
     {
         private readonly JwtOptions _jwtOptions;
-        private readonly ApplicationDbContext _context;
-        private readonly UserManager<User> _userManager;
-        private readonly RoleManager<IdentityRole> _roleManager;
 
-        public TokenService(IOptions<JwtOptions> jwtOptions, ApplicationDbContext context, UserManager<User> userManager, RoleManager<IdentityRole> roleManager)
+        public TokenService(IOptions<JwtOptions> jwtOptions)
         {
             _jwtOptions = jwtOptions.Value;
-            _context = context;
-            _userManager = userManager;
-            _roleManager = roleManager;
         }
 
         public async Task<string> GenerateAccessTokenAsync(User user)
@@ -31,14 +23,10 @@ namespace ChatHubSolution.Services
 
             var key = Encoding.ASCII.GetBytes(_jwtOptions.Secret);
 
-            var roles = await _userManager.GetRolesAsync(user);
-
             var claimList = new List<Claim>
             {
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.MobilePhone, user.PhoneNumber ?? ""),
                 new Claim(JwtRegisteredClaimNames.Jti, user.Id),
-                new Claim(ClaimTypes.Role, string.Join(";", roles)),
             };
 
             var tokenDescriptor = new SecurityTokenDescriptor
@@ -46,7 +34,7 @@ namespace ChatHubSolution.Services
                 Issuer = _jwtOptions.Issuer,
                 Audience = _jwtOptions.Audience,
                 Subject = new ClaimsIdentity(claimList),
-                Expires = DateTime.UtcNow.AddHours(8),
+                Expires = DateTime.UtcNow.AddHours(24),
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key),
                     SecurityAlgorithms.HmacSha256)
             };

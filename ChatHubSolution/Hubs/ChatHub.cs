@@ -1,8 +1,10 @@
 ﻿using Cassandra.Data.Linq;
 using ChatHubSolution.Data.Entities;
+using ChatHubSolution.DTOs;
 using ChatHubSolution.Implementation.Interfaces;
 using ChatHubSolution.Models;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.IdentityModel.Tokens;
 
 namespace ChatHubSolution.Hubs
 {
@@ -15,57 +17,121 @@ namespace ChatHubSolution.Hubs
             _session = provider.GetSession();
         }
 
-        public async Task JoinChat(UserConnection conn)
-        {
-            await Clients.All.SendAsync("ReceiveMessage", conn.SenderName, $"{conn.SenderName} has joined conversation {conn.ConversationId}");
-        }
-
         public async Task JoinSpecificChatRoom(UserConnection conn)
         {
-            var conversations = new Table<Conversation>(_session);
-            var conversation = await conversations.FirstOrDefault(c => new List<string> { conn.SenderId, conn.ReceiverId }.Equals(new List<string> { c.UserOneId, c.UserTwoId })).ExecuteAsync();
-            if (conversation == null)
+            if (conn.ReceiverId.IsNullOrEmpty())
+                throw new Exception("ReceiverId is required");
+            if (conn.SenderId.IsNullOrEmpty())
+                throw new Exception("SenderId is required");
+
+            var getConversation = await _session.PrepareAsync("SELECT * FROM conversations WHERE useroneid = ? AND usertwoid = ? ALLOW FILTERING");
+            var row1 = (await _session.ExecuteAsync(getConversation.Bind(conn.SenderId, conn.ReceiverId))).FirstOrDefault();
+            var row2 = (await _session.ExecuteAsync(getConversation.Bind(conn.ReceiverId, conn.SenderId))).FirstOrDefault();
+
+            if (row1 == null && row2 == null)
             {
-                var newConversation = new Conversation
+                var insertConversation = await _session.PrepareAsync(
+                    "INSERT INTO conversations (" +
+                    "id, " +
+                    "connectionid, " +
+                    "useroneid, " +
+                    "usertwoid, " +
+                    "status, " +
+                    "createdat, " +
+                    "updatedat) VALUES(?, ?, ?, ?, ?, ?, ?)");
+
+                var conversation = new Conversation
                 {
-                    Id = Context.ConnectionId,
+                    Id = Guid.NewGuid().ToString(),
+                    ConnectionId = Context.ConnectionId,
                     UserOneId = conn.SenderId,
                     UserTwoId = conn.ReceiverId,
                     Status = "ACTIVE",
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow.ToString(),
+                    UpdatedAt = DateTime.UtcNow.ToString(),
                 };
-                await conversations.Insert(newConversation).ExecuteAsync();
 
-                await Groups.AddToGroupAsync(Context.ConnectionId, newConversation.Id);
+                var result = await _session.ExecuteAsync(insertConversation.Bind(
+                        conversation.Id,
+                        conversation.ConnectionId,
+                        conversation.UserOneId,
+                        conversation.UserTwoId,
+                        conversation.Status,
+                        conversation.CreatedAt,
+                        conversation.UpdatedAt));
 
-                await Clients.Group(newConversation.Id).SendAsync("ReceiveMessage", conn.SenderId, $"{conn.SenderName} has created  conversation {newConversation.Id}");
+                if (result != null)
+                {
+                    await Groups.AddToGroupAsync(Context.ConnectionId, conversation.Id);
+
+                    var conversationDto = new ConversationDto
+                    {
+                        Id = conversation.Id,
+                        ConnectionId = Context.ConnectionId,
+                        Status = conversation.Status,
+                        ReceiverId = conn.ReceiverId,
+                        ReceiverName = conn.ReceiverName,
+                        CreatedAt = DateTime.Parse(conversation.CreatedAt),
+                        UpdatedAt = DateTime.Parse(conversation.UpdatedAt),
+                    };
+
+                    await Clients.Group(conversation.Id).SendAsync("JoinSpecificChatRoom", conversationDto, $"{conn.SenderName} has created  conversation {conversation.Id}");
+                }
             }
+            else
+            {
+                var conversationRow = row1 != null ? row1 : row2;
 
-            await Groups.AddToGroupAsync(Context.ConnectionId, conversation.Id);
-            await Clients.Group(conversation.Id).SendAsync("ReceiveMessage", conn.SenderId, $"{conn.SenderName} has joined  conversation {conversation.Id}");
+                var conversationDto = new ConversationDto
+                {
+                    Id = conversationRow.GetValue<string>("id"),
+                    ConnectionId = Context.ConnectionId,
+                    Status = conversationRow.GetValue<string>("status"),
+                    ReceiverId = conn.ReceiverId,
+                    ReceiverName = conn.ReceiverName,
+                    CreatedAt = DateTime.Parse(conversationRow.GetValue<string>("createdat")),
+                    UpdatedAt = DateTime.Parse(conversationRow.GetValue<string>("updatedat")),
+                };
+
+                await Groups.AddToGroupAsync(Context.ConnectionId, conversationDto.Id);
+                await Clients.Group(conversationDto.Id).SendAsync("JoinSpecificChatRoom", conversationDto, $"{conn.SenderName} has joined  conversation {conversationDto.Id}");
+            }
         }
 
-        public async Task SendMessage(string senderId, string msg)
+        public async Task SendMessage(SendMessageRequestDto request)
         {
-            var conversations = new Table<Conversation>(_session);
-            var conversation = await conversations.FirstOrDefault(c => c.ConnectionId.Equals(Context.ConnectionId)).ExecuteAsync();
+            var getConversation = await _session.PrepareAsync("SELECT * FROM conversations WHERE id = ? ALLOW FILTERING");
+            var row = (await _session.ExecuteAsync(getConversation.Bind(request.ConversationId))).FirstOrDefault();
 
-            if (conversation != null)
+            if (row != null)
             {
-                await Clients.Group(conversation.Id).SendAsync("ReceiveSpecificMessage", senderId, msg);
+                await Clients.Group(request.ConversationId).SendAsync("ReceiveSpecificMessage", request.ConversationId, request.SenderId, request.Content);
 
-                var messages = new Table<Message>(_session);
-                await messages.Insert(new Message
+                var insertMessage = await _session.PrepareAsync("INSERT INTO messages (id,userid,conversationId,content,status,createdat,updatedat) VALUES (?, ?, ?, ?, ?, ?, ?)");
+
+                var updateConversation = _session.Prepare("UPDATE conversations SET updatedat = ? WHERE id = ? ALLOW FILTERING");
+
+                var message = new Message
                 {
-                    Id = conversation.Id,
-                    Content = msg,
-                    ConversationId = conversation.Id,
+                    Id = Guid.NewGuid().ToString(),
+                    UserId = request.SenderId,
+                    ConversationId = request.ConversationId,
+                    Content = request.Content,
                     Status = "ACTIVE",
-                    UserId = senderId,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                }).ExecuteAsync();
+                    CreatedAt = DateTime.UtcNow.ToString(),
+                    UpdatedAt = DateTime.UtcNow.ToString(),
+                };
+
+                await _session.ExecuteAsync(insertMessage.Bind(
+                        message.Id,
+                        message.UserId,
+                        message.ConversationId,
+                        message.Content,
+                        message.Status,
+                        message.CreatedAt,
+                        message.UpdatedAt));
+
+                await _session.ExecuteAsync(updateConversation.Bind(DateTime.UtcNow.ToString(), request.ConversationId));
             }
         }
     }

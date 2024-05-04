@@ -24,7 +24,6 @@ namespace ChatHubSolution.Extentions
                     x.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
                     x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
                 })
-                .AddCookie()
                 .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, x =>
                 {
                     x.TokenValidationParameters = new TokenValidationParameters

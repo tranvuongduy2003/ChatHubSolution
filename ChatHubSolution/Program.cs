@@ -7,7 +7,7 @@ var AppCors = "AppCors";
 
 var builder = WebApplication.CreateBuilder(args);
 
-Log.Information("Starting EvenHub API up");
+Log.Information("Starting ChatHub API up");
 
 try
 {
@@ -34,6 +34,6 @@ catch (Exception ex)
 }
 finally
 {
-    Log.Information("Shut down EventHub API complete");
+    Log.Information("Shut down ChatHub API complete");
     Log.CloseAndFlush();
 }

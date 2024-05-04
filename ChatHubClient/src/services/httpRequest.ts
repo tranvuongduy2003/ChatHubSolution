@@ -1,5 +1,6 @@
 import { AxiosInstance } from "axios";
 import { axiosInstance, IConfig } from "./initRequest";
+import { IResponse } from "@/interfaces/response.interface";
 
 class HttpRequest {
   api: AxiosInstance;
@@ -8,24 +9,28 @@ class HttpRequest {
     this.api = axiosInstance;
   }
 
-  async get(url: string, config?: IConfig) {
-    return this.api.get(url, config);
+  async get<TData>(url: string, config?: IConfig) {
+    return this.api.get<IResponse<TData>, IResponse<TData>>(url, config);
   }
 
   async post<TPayload, TData>(url: string, data: TPayload, config?: IConfig) {
-    return this.api.post<TData>(url, data, config);
+    return this.api.post<IResponse<TData>, IResponse<TData>>(url, data, config);
   }
 
   async put<TPayload, TData>(url: string, data: TPayload, config?: IConfig) {
-    return this.api.put<TData>(url, data, config);
+    return this.api.put<IResponse<TData>, IResponse<TData>>(url, data, config);
   }
 
   async patch<TPayload, TData>(url: string, data?: TPayload, config?: IConfig) {
-    return this.api.patch<TData>(url, data, config);
+    return this.api.patch<IResponse<TData>, IResponse<TData>>(
+      url,
+      data,
+      config
+    );
   }
 
-  async delete(url: string, config?: IConfig) {
-    return this.api.delete(url, config);
+  async delete<TData>(url: string, config?: IConfig) {
+    return this.api.delete<IResponse<TData>, IResponse<TData>>(url, config);
   }
 }
 
