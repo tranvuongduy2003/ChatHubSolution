@@ -23,6 +23,8 @@ namespace ChatHubSolution.Hubs
                 throw new Exception("ReceiverId is required");
             if (conn.SenderId.IsNullOrEmpty())
                 throw new Exception("SenderId is required");
+            if (conn.ReceiverId == conn.SenderId)
+                throw new Exception("SenderId is same as ReceiverId");
 
             var getConversation = await _session.PrepareAsync("SELECT * FROM conversations WHERE useroneid = ? AND usertwoid = ? ALLOW FILTERING");
             var row1 = (await _session.ExecuteAsync(getConversation.Bind(conn.SenderId, conn.ReceiverId))).FirstOrDefault();
@@ -105,12 +107,6 @@ namespace ChatHubSolution.Hubs
 
             if (row != null)
             {
-                await Clients.Group(request.ConversationId).SendAsync("ReceiveSpecificMessage", request.ConversationId, request.SenderId, request.Content);
-
-                var insertMessage = await _session.PrepareAsync("INSERT INTO messages (id,userid,conversationId,content,status,createdat,updatedat) VALUES (?, ?, ?, ?, ?, ?, ?)");
-
-                var updateConversation = _session.Prepare("UPDATE conversations SET updatedat = ? WHERE id = ? ALLOW FILTERING");
-
                 var message = new Message
                 {
                     Id = Guid.NewGuid().ToString(),
@@ -121,6 +117,12 @@ namespace ChatHubSolution.Hubs
                     CreatedAt = DateTime.UtcNow.ToString(),
                     UpdatedAt = DateTime.UtcNow.ToString(),
                 };
+
+                await Clients.Group(request.ConversationId).SendAsync("ReceiveSpecificMessage", message);
+
+                var insertMessage = await _session.PrepareAsync("INSERT INTO messages (id,userid,conversationId,content,status,createdat,updatedat) VALUES (?, ?, ?, ?, ?, ?, ?)");
+
+                var updateConversation = _session.Prepare("UPDATE conversations SET updatedat = ? WHERE id = ?");
 
                 await _session.ExecuteAsync(insertMessage.Bind(
                         message.Id,

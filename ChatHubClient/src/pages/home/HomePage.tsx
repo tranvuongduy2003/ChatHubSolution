@@ -94,7 +94,7 @@ export function HomePage() {
         </Button>
       </div>
       <div className="flex gap-8 h-[90%]">
-        <div className="w-1/3 p-8 overflow-y-scroll border-2 border-gray-200 border-solid rounded-lg">
+        <div className="w-1/3 p-8 border-2 border-gray-200 border-solid rounded-lg">
           <Input
             placeholder="Find user"
             onChange={(e) => debounceFn(e.target.value)}

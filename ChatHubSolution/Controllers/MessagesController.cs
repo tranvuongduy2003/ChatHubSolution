@@ -23,8 +23,6 @@ namespace ChatHubSolution.Controllers
             var getMessage = await _session.PrepareAsync("SELECT * FROM messages WHERE conversationid = ? ALLOW FILTERING");
             var rows = await _session.ExecuteAsync(getMessage.Bind(conversationId));
 
-            rows = (Cassandra.RowSet)rows.OrderBy(r => DateTime.Parse(r.GetValue<string>("updatedat")));
-
             foreach (var row in rows)
             {
                 messageDtos.Add(new MessageDto()
@@ -39,7 +37,7 @@ namespace ChatHubSolution.Controllers
                 });
             }
 
-            return Ok(new ApiOkResponse(messageDtos));
+            return Ok(new ApiOkResponse(messageDtos.OrderBy(m => m.CreatedAt).ToList()));
         }
     }
 }

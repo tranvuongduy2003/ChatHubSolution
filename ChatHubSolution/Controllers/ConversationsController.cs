@@ -25,8 +25,8 @@ namespace ChatHubSolution.Controllers
 
             var getConversationsByUserOne = await _session.PrepareAsync("SELECT * FROM conversations WHERE useroneid = ? ALLOW FILTERING");
             var getConversationsByUserTwo = await _session.PrepareAsync("SELECT * FROM conversations WHERE usertwoid = ? ALLOW FILTERING");
-            var rows1 = await _session.ExecuteAsync(getConversationsByUserOne.Bind(userId));
-            var rows2 = await _session.ExecuteAsync(getConversationsByUserTwo.Bind(userId));
+            var rows1 = (await _session.ExecuteAsync(getConversationsByUserOne.Bind(userId))).Where(r => r.GetValue<string>("usertwoid") != userId);
+            var rows2 = (await _session.ExecuteAsync(getConversationsByUserTwo.Bind(userId))).Where(r => r.GetValue<string>("useroneid") != userId);
 
             var rows = rows1.Concat(rows2).OrderBy(r => DateTime.Parse(r.GetValue<string>("updatedat")));
 
